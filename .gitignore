@@ -27,13 +27,15 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE
+# IDE & Claude Code Context
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
+CLAUDE.md
+.clod.md
 
 # Environment variables
 .env
