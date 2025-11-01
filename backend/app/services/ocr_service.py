@@ -89,8 +89,11 @@ class OCRService:
             logger.error(f"Failed to extract text from PDF {pdf_path}: {e}")
             raise
 
-    def extract_text(self, file_path: str) -> str:
-        file_ext = Path(file_path).suffix.lower()
+    def extract_text(self, file_path: str, original_filename: str = None) -> str:
+        if original_filename:
+            file_ext = Path(original_filename).suffix.lower()
+        else:
+            file_ext = Path(file_path).suffix.lower()
 
         if file_ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"]:
             return self.extract_text_from_image(file_path)
@@ -99,9 +102,9 @@ class OCRService:
         else:
             raise ValueError(f"Unsupported file format: {file_ext}")
 
-    def process_document(self, file_path: str) -> dict:
+    def process_document(self, file_path: str, original_filename: str = None) -> dict:
         try:
-            text = self.extract_text(file_path)
+            text = self.extract_text(file_path, original_filename)
             return {
                 "success": True,
                 "text": text,

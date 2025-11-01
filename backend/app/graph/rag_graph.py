@@ -113,16 +113,28 @@ class RAGGraph:
         logger.info("Performing single retrieval...")
         query = state.get("query", "")
 
-        query_embedding = embedding_service.embed_query(query)
-        retrieved_docs = vector_store_service.search(
-            query_embedding.tolist(),
-            top_k=settings.RETRIEVAL_TOP_K
-        )
+        try:
+            query_embedding = embedding_service.embed_query(query)
+            if query_embedding is None:
+                raise ValueError("Query embedding returned None")
 
-        state["all_retrieved_documents"] = retrieved_docs
-        state["num_contexts_retrieved"] = len(retrieved_docs)
+            retrieved_docs = vector_store_service.search(
+                query_embedding.tolist(),
+                top_k=settings.RETRIEVAL_TOP_K
+            )
 
-        logger.info(f"Retrieved {len(retrieved_docs)} documents")
+            if retrieved_docs is None:
+                retrieved_docs = []
+
+            state["all_retrieved_documents"] = retrieved_docs if isinstance(retrieved_docs, list) else []
+            state["num_contexts_retrieved"] = len(state["all_retrieved_documents"])
+
+            logger.info(f"Retrieved {len(state['all_retrieved_documents'])} documents")
+        except Exception as e:
+            logger.warning(f"Retrieval failed: {e}, continuing with empty results")
+            state["all_retrieved_documents"] = []
+            state["num_contexts_retrieved"] = 0
+
         return state
 
     def retrieve_parallel(self, state: RAGState) -> RAGState:
@@ -132,19 +144,29 @@ class RAGGraph:
         all_docs = []
         seen_ids = set()
 
-        for variant in query_variants:
-            logger.debug(f"Retrieving for variant: '{variant}'")
-            query_embedding = embedding_service.embed_query(variant)
-            retrieved_docs = vector_store_service.search(
-                query_embedding.tolist(),
-                top_k=settings.RETRIEVAL_TOP_K
-            )
+        try:
+            for variant in query_variants:
+                logger.debug(f"Retrieving for variant: '{variant}'")
+                query_embedding = embedding_service.embed_query(variant)
+                if query_embedding is None:
+                    logger.warning(f"Query embedding returned None for variant: '{variant}'")
+                    continue
 
-            for doc in retrieved_docs:
-                doc_id = doc.get("metadata", {}).get("chunk_id")
-                if doc_id not in seen_ids:
-                    all_docs.append(doc)
-                    seen_ids.add(doc_id)
+                retrieved_docs = vector_store_service.search(
+                    query_embedding.tolist(),
+                    top_k=settings.RETRIEVAL_TOP_K
+                )
+
+                if retrieved_docs is None:
+                    retrieved_docs = []
+
+                for doc in retrieved_docs:
+                    doc_id = doc.get("metadata", {}).get("chunk_id")
+                    if doc_id not in seen_ids:
+                        all_docs.append(doc)
+                        seen_ids.add(doc_id)
+        except Exception as e:
+            logger.warning(f"Parallel retrieval failed: {e}, using retrieved documents so far")
 
         logger.info(f"Retrieved {len(all_docs)} unique documents from parallel retrieval")
         state["all_retrieved_documents"] = all_docs

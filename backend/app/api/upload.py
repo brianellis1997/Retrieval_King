@@ -21,7 +21,7 @@ def process_document(file_path: str, document_id: str, filename: str):
     try:
         logger.info(f"Processing document: {filename}")
 
-        ocr_result = ocr_service.process_document(file_path)
+        ocr_result = ocr_service.process_document(file_path, filename)
         if not ocr_result["success"]:
             logger.error(f"OCR failed for {filename}: {ocr_result.get('error')}")
             return
