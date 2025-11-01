@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: retrieval-king-backend
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_PATH: /data/chroma
+      UPLOADS_DIR: /data/uploads
+      MODELS_CACHE_DIR: /data/models
+      DEVICE: cuda
+    volumes:
+      - ./data/chroma:/data/chroma
+      - ./data/uploads:/data/uploads
+      - ./data/models:/data/models
+    depends_on:
+      - chromadb
+    networks:
+      - retrieval-king-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: retrieval-king-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - retrieval-king-network
+    environment:
+      REACT_APP_API_URL: http://backend:8000
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: retrieval-king-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data/chroma:/chroma/data
+    networks:
+      - retrieval-king-network
+
+volumes:
+  chroma_data:
+
+networks:
+  retrieval-king-network:
+    driver: bridge

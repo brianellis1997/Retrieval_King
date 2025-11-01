@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.dockerignore
+.DS_Store
+.env
+.env.local
+dist
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.coverage
+.pytest_cache
