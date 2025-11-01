@@ -1,16 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core import settings
 from app.api import upload, query
 
 app = FastAPI(
-    title="Retrieval King",
+    title=settings.API_TITLE,
     description="RAG Application with DeepSeek OCR and Granite Embeddings",
-    version="0.1.0"
+    version=settings.API_VERSION
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

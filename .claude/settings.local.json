@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(__NEW_LINE__ touch backend/__init__.py backend/app/__init__.py backend/app/core/__init__.py backend/app/models/__init__.py backend/app/services/__init__.py backend/app/graph/__init__.py backend/app/api/__init__.py)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitialize project structure and FastAPI setup\n\n- Create backend directory structure with app modules\n- Add requirements.txt with all dependencies\n- Add .gitignore for Python and Node projects\n- Create main FastAPI entry point with CORS support\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
