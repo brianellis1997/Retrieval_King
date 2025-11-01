@@ -3,9 +3,11 @@ FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-venv \
+    python3.10 \
+    python3.10-venv \
+    python3.10-dev \
     python3-pip \
+    build-essential \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,7 +16,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel packaging && \
+    pip install --no-cache-dir torch==2.6.0 transformers==4.46.3 && \
+    pip install --no-cache-dir --no-build-isolation -r requirements.txt
 
 COPY . .
 

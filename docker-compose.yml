@@ -13,7 +13,7 @@ services:
       DATABASE_PATH: /data/chroma
       UPLOADS_DIR: /data/uploads
       MODELS_CACHE_DIR: /data/models
-      DEVICE: cuda
+      DEVICE: cpu
     volumes:
       - ./data/chroma:/data/chroma
       - ./data/uploads:/data/uploads
@@ -22,13 +22,6 @@ services:
       - chromadb
     networks:
       - retrieval-king-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   frontend:
     build:

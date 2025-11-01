@@ -9,9 +9,13 @@ logger = logging.getLogger(__name__)
 class RerankerService:
     def __init__(self):
         self.model = None
-        self._load_model()
+        self._model_loaded = False
+        self._load_attempted = False
 
     def _load_model(self):
+        if self._load_attempted:
+            return
+        self._load_attempted = True
         logger.info(f"Loading reranker model: {settings.RERANKER_MODEL}")
         try:
             self.model = CrossEncoder(
@@ -19,10 +23,11 @@ class RerankerService:
                 cache_folder=str(settings.MODELS_CACHE_DIR),
                 device=settings.DEVICE if settings.DEVICE == "cuda" else "cpu"
             )
+            self._model_loaded = True
             logger.info("Reranker model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load reranker model: {e}")
-            raise
+            self._model_loaded = False
 
     def rerank(
         self,
@@ -31,6 +36,12 @@ class RerankerService:
         top_k: int = None
     ) -> List[Tuple[int, float]]:
         try:
+            if not self._model_loaded:
+                self._load_model()
+
+            if not self._model_loaded:
+                raise RuntimeError("Reranker model failed to load. Reranking functionality is unavailable.")
+
             if top_k is None:
                 top_k = settings.RERANK_TOP_K
 
@@ -58,6 +69,12 @@ class RerankerService:
         top_k: int = None
     ) -> List[Tuple[Dict, float]]:
         try:
+            if not self._model_loaded:
+                self._load_model()
+
+            if not self._model_loaded:
+                raise RuntimeError("Reranker model failed to load. Reranking functionality is unavailable.")
+
             if top_k is None:
                 top_k = settings.RERANK_TOP_K
 

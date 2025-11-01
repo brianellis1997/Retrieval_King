@@ -14,9 +14,13 @@ class OCRService:
         self.device = settings.DEVICE if torch.cuda.is_available() else "cpu"
         self.processor = None
         self.model = None
-        self._load_model()
+        self._model_loaded = False
+        self._load_attempted = False
 
     def _load_model(self):
+        if self._load_attempted:
+            return
+        self._load_attempted = True
         logger.info(f"Loading DeepSeek-OCR model on device: {self.device}")
         try:
             self.processor = AutoProcessor.from_pretrained(
@@ -30,13 +34,20 @@ class OCRService:
                 device_map=self.device,
                 trust_remote_code=True
             )
+            self._model_loaded = True
             logger.info("DeepSeek-OCR model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load DeepSeek-OCR model: {e}")
-            raise
+            self._model_loaded = False
 
     def extract_text_from_image(self, image_path: str) -> str:
         try:
+            if not self._model_loaded:
+                self._load_model()
+
+            if not self._model_loaded:
+                raise RuntimeError("DeepSeek-OCR model failed to load. OCR functionality is unavailable.")
+
             image = Image.open(image_path).convert("RGB")
 
             inputs = self.processor(images=image, return_tensors="pt").to(self.device)
