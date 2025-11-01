@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, List
 import torch
 from PIL import Image
-from transformers import AutoProcessor, AutoModelForCausalLM
+from transformers import AutoProcessor, AutoModel
 from app.core import settings
 
 logger = logging.getLogger(__name__)
@@ -25,9 +25,10 @@ class OCRService:
         try:
             self.processor = AutoProcessor.from_pretrained(
                 settings.OCR_MODEL,
-                cache_dir=str(settings.MODELS_CACHE_DIR)
+                cache_dir=str(settings.MODELS_CACHE_DIR),
+                trust_remote_code=True
             )
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.model = AutoModel.from_pretrained(
                 settings.OCR_MODEL,
                 cache_dir=str(settings.MODELS_CACHE_DIR),
                 torch_dtype=torch.bfloat16,
@@ -38,6 +39,7 @@ class OCRService:
             logger.info("DeepSeek-OCR model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load DeepSeek-OCR model: {e}")
+            logger.warning("Falling back to pytesseract for OCR")
             self._model_loaded = False
 
     def extract_text_from_image(self, image_path: str) -> str:
