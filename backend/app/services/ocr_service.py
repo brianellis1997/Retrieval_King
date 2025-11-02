@@ -1,18 +1,20 @@
 import logging
 from pathlib import Path
 from typing import Optional, List
+import os
 import torch
-from PIL import Image
-from transformers import AutoProcessor, AutoModel
+from transformers import AutoTokenizer, AutoModel
 from app.core import settings
 
 logger = logging.getLogger(__name__)
+
+os.environ['FLASH_ATTENTION_SKIP_TORCH_CHECK'] = '1'
 
 
 class OCRService:
     def __init__(self):
         self.device = settings.DEVICE if torch.cuda.is_available() else "cpu"
-        self.processor = None
+        self.tokenizer = None
         self.model = None
         self._model_loaded = False
         self._load_attempted = False
@@ -23,18 +25,34 @@ class OCRService:
         self._load_attempted = True
         logger.info(f"Loading DeepSeek-OCR model on device: {self.device}")
         try:
-            self.processor = AutoProcessor.from_pretrained(
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 settings.OCR_MODEL,
                 cache_dir=str(settings.MODELS_CACHE_DIR),
                 trust_remote_code=True
             )
-            self.model = AutoModel.from_pretrained(
-                settings.OCR_MODEL,
-                cache_dir=str(settings.MODELS_CACHE_DIR),
-                torch_dtype=torch.bfloat16,
-                device_map=self.device,
-                trust_remote_code=True
-            )
+            try:
+                self.model = AutoModel.from_pretrained(
+                    settings.OCR_MODEL,
+                    cache_dir=str(settings.MODELS_CACHE_DIR),
+                    torch_dtype=torch.bfloat16,
+                    device_map=self.device,
+                    trust_remote_code=True,
+                    _attn_implementation='flash_attention_2'
+                )
+                logger.info("DeepSeek-OCR model loaded with flash_attention_2")
+            except (ImportError, ValueError) as flash_err:
+                logger.warning(f"Flash-attention not available: {flash_err}. Falling back to eager attention.")
+                self.model = AutoModel.from_pretrained(
+                    settings.OCR_MODEL,
+                    cache_dir=str(settings.MODELS_CACHE_DIR),
+                    torch_dtype=torch.bfloat16,
+                    device_map=self.device,
+                    trust_remote_code=True,
+                    attn_implementation='eager'
+                )
+                logger.info("DeepSeek-OCR model loaded with eager attention")
+
+            self.model = self.model.eval()
             self._model_loaded = True
             logger.info("DeepSeek-OCR model loaded successfully")
         except Exception as e:
@@ -49,23 +67,27 @@ class OCRService:
             if not self._model_loaded:
                 raise RuntimeError("DeepSeek-OCR model failed to load. OCR functionality is unavailable.")
 
-            image = Image.open(image_path).convert("RGB")
-
-            prompt = "<image_0>\nOCR:"
-            inputs = self.processor(text=prompt, images=image, return_tensors="pt")
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=4096,
-                    do_sample=False,
-                    top_p=None,
-                    temperature=None
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "DeepSeek-OCR requires CUDA/GPU to run. CPU inference is not supported. "
+                    "Please run the application on a machine with NVIDIA GPU support."
                 )
 
-            text = self.processor.decode(outputs[0], skip_special_tokens=True)
-            text = text.replace(prompt, "").strip()
+            prompt = "<image>\nFree OCR."
+
+            result = self.model.infer(
+                self.tokenizer,
+                prompt=prompt,
+                image_file=image_path,
+                output_path=None,
+                base_size=1024,
+                image_size=640,
+                crop_mode=True,
+                save_results=False
+            )
+
+            text = result if isinstance(result, str) else str(result)
+            text = text.strip()
 
             logger.info(f"Extracted text from {image_path}: {len(text)} characters")
             return text

@@ -4,6 +4,7 @@ python-multipart>=0.0.18
 torch>=2.3.0
 torchvision>=0.17.0
 transformers>=4.46.3
+tokenizers>=0.20.3
 addict>=2.4.0
 easydict>=1.9
 einops>=0.7.0

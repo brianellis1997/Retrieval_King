@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 COPY requirements.txt .
 
 RUN pip install --upgrade pip setuptools wheel packaging && \
-    pip install --no-cache-dir torch==2.6.0 transformers==4.46.3 && \
+    pip install --no-cache-dir torch torchvision transformers==4.46.3 && \
     pip install --no-cache-dir --no-build-isolation -r requirements.txt
 
 COPY . .
