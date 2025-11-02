@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, List
 import torch
 from PIL import Image
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoProcessor, AutoModel
 from app.core import settings
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OCRService:
     def __init__(self):
         self.device = settings.DEVICE if torch.cuda.is_available() else "cpu"
-        self.tokenizer = None
+        self.processor = None
         self.model = None
         self._model_loaded = False
         self._load_attempted = False
@@ -23,8 +23,7 @@ class OCRService:
         self._load_attempted = True
         logger.info(f"Loading DeepSeek-OCR model on device: {self.device}")
         try:
-            from transformers import AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
+            self.processor = AutoProcessor.from_pretrained(
                 settings.OCR_MODEL,
                 cache_dir=str(settings.MODELS_CACHE_DIR),
                 trust_remote_code=True
@@ -50,17 +49,23 @@ class OCRService:
             if not self._model_loaded:
                 raise RuntimeError("DeepSeek-OCR model failed to load. OCR functionality is unavailable.")
 
-            text = self.model.infer(
-                self.tokenizer,
-                prompt="<image_0>\nOCR",
-                image_file=image_path,
-                output_path=None,
-                base_size=1024,
-                image_size=640,
-                crop_mode=True,
-                save_results=False,
-                test_compress=False
-            )
+            image = Image.open(image_path).convert("RGB")
+
+            prompt = "<image_0>\nOCR:"
+            inputs = self.processor(text=prompt, images=image, return_tensors="pt")
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=4096,
+                    do_sample=False,
+                    top_p=None,
+                    temperature=None
+                )
+
+            text = self.processor.decode(outputs[0], skip_special_tokens=True)
+            text = text.replace(prompt, "").strip()
 
             logger.info(f"Extracted text from {image_path}: {len(text)} characters")
             return text
