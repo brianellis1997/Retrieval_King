@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, List
 import torch
 from PIL import Image
-from transformers import AutoProcessor, AutoModel
+from transformers import AutoTokenizer, AutoModel
 from app.core import settings
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OCRService:
     def __init__(self):
         self.device = settings.DEVICE if torch.cuda.is_available() else "cpu"
-        self.processor = None
+        self.tokenizer = None
         self.model = None
         self._model_loaded = False
         self._load_attempted = False
@@ -23,7 +23,8 @@ class OCRService:
         self._load_attempted = True
         logger.info(f"Loading DeepSeek-OCR model on device: {self.device}")
         try:
-            self.processor = AutoProcessor.from_pretrained(
+            from transformers import AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 settings.OCR_MODEL,
                 cache_dir=str(settings.MODELS_CACHE_DIR),
                 trust_remote_code=True
@@ -38,8 +39,7 @@ class OCRService:
             self._model_loaded = True
             logger.info("DeepSeek-OCR model loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to load DeepSeek-OCR model: {e}")
-            logger.warning("Falling back to pytesseract for OCR")
+            logger.error(f"Failed to load DeepSeek-OCR model: {e}", exc_info=True)
             self._model_loaded = False
 
     def extract_text_from_image(self, image_path: str) -> str:
@@ -50,22 +50,22 @@ class OCRService:
             if not self._model_loaded:
                 raise RuntimeError("DeepSeek-OCR model failed to load. OCR functionality is unavailable.")
 
-            image = Image.open(image_path).convert("RGB")
+            text = self.model.infer(
+                self.tokenizer,
+                prompt="<image_0>\nOCR",
+                image_file=image_path,
+                output_path=None,
+                base_size=1024,
+                image_size=640,
+                crop_mode=True,
+                save_results=False,
+                test_compress=False
+            )
 
-            inputs = self.processor(images=image, return_tensors="pt").to(self.device)
-
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=4096,
-                    temperature=0.1
-                )
-
-            text = self.processor.decode(outputs[0], skip_special_tokens=True)
             logger.info(f"Extracted text from {image_path}: {len(text)} characters")
             return text
         except Exception as e:
-            logger.error(f"Failed to extract text from image {image_path}: {e}")
+            logger.error(f"Failed to extract text from image {image_path}: {e}", exc_info=True)
             raise
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:

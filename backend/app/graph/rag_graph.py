@@ -27,6 +27,7 @@ class RAGGraph:
         workflow = StateGraph(RAGState)
 
         workflow.add_node("classify_query", self.classify_query)
+        workflow.add_node("classify_and_rewrite", self.classify_and_rewrite)
         workflow.add_node("rewrite_query", self.rewrite_query)
         workflow.add_node("retrieve_single", self.retrieve_single)
         workflow.add_node("retrieve_parallel", self.retrieve_parallel)
@@ -35,8 +36,10 @@ class RAGGraph:
 
         workflow.set_entry_point("classify_query")
 
+        workflow.add_edge("classify_query", "classify_and_rewrite")
+
         workflow.add_conditional_edges(
-            "classify_query",
+            "classify_and_rewrite",
             self.should_rewrite,
             {
                 "rewrite": "rewrite_query",
@@ -65,21 +68,32 @@ class RAGGraph:
         state["classification_start_time"] = time.time()
         return state
 
-    def should_rewrite(self, state: RAGState) -> str:
+    def classify_and_rewrite(self, state: RAGState) -> RAGState:
         query = state.get("query", "")
-
         logger.debug(f"Deciding if query needs rewriting: '{query}'")
 
-        rewrite_result = llm_service.rewrite_query(query)
+        try:
+            rewrite_result = llm_service.rewrite_query(query)
+            if rewrite_result is None:
+                rewrite_result = {}
+        except Exception as e:
+            logger.warning(f"Query rewriting failed: {e}")
+            rewrite_result = {"should_rewrite": False}
 
         if rewrite_result.get("should_rewrite", False):
             state["should_rewrite"] = True
             state["original_query"] = query
             logger.info("Query marked for rewriting")
-            return "rewrite"
         else:
             state["should_rewrite"] = False
             logger.info("Query will be used directly")
+
+        return state
+
+    def should_rewrite(self, state: RAGState) -> str:
+        if state.get("should_rewrite", False):
+            return "rewrite"
+        else:
             return "direct"
 
     def rewrite_query(self, state: RAGState) -> RAGState:

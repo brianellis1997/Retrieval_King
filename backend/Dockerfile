@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     build-essential \
     git \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1

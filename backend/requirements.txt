@@ -21,3 +21,4 @@ pillow>=11.0.0
 pypdf>=4.3.1
 python-pptx>=0.6.23
 pdf2image>=1.16.0
+accelerate>=0.26.0
